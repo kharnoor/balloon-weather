@@ -1,21 +1,27 @@
 // src/utils/fetchData.js
 
+// Public CORS proxy (no API key, but subject to rate-limits)
+const CORS_PROXY = 'https://api.allorigins.win/raw?url='
+
+// Build the full URL to the balloon endpoint through the proxy
+function balloonUrl(hour) {
+  const target = `https://a.windbornesystems.com/treasure/${hour}.json`
+  return `${CORS_PROXY}${encodeURIComponent(target)}`
+}
+
 export async function fetchBalloonHistory() {
   const allPoints = []
 
   for (let h = 0; h < 24; h++) {
     const hour = String(h).padStart(2, '0')
     try {
-      // CRA dev proxy will forward this to https://a.windbornesystems.com/treasure/XX.json
-      const res = await fetch(`/treasure/${hour}.json`)
+      const res = await fetch(balloonUrl(hour))
       if (!res.ok) continue
+      const txt = await res.text()
+      if (!txt.trim()) continue
+      const d = JSON.parse(txt)
 
-      const text = await res.text()
-      if (!text.trim()) continue
-
-      const d = JSON.parse(text)
-
-      // Case A: top-level array of [lat, lon, alt] triples
+      // handle [[lat,lon,alt], …]
       if (Array.isArray(d) && Array.isArray(d[0])) {
         d.forEach(([lat, lon, alt]) => {
           if (typeof lat === 'number' && typeof lon === 'number') {
@@ -23,36 +29,9 @@ export async function fetchBalloonHistory() {
           }
         })
       }
-      // Case B: array of objects
-      else if (Array.isArray(d)) {
-        allPoints.push(
-          ...d.filter(
-            b => b && typeof b.lat === 'number' && typeof b.lon === 'number'
-          )
-        )
-      }
-      // Case C: single object or nested arrays in an object
-      else if (d && typeof d === 'object') {
-        if ('lat' in d && 'lon' in d) {
-          allPoints.push(d)
-        } else {
-          Object.values(d).forEach(val => {
-            if (Array.isArray(val)) {
-              val.forEach(item => {
-                if (
-                  item &&
-                  typeof item.lat === 'number' &&
-                  typeof item.lon === 'number'
-                ) {
-                  allPoints.push(item)
-                }
-              })
-            }
-          })
-        }
-      }
+      // (you can keep your other parsing branches here if needed)
     } catch {
-      // skip 404s, empty bodies, parse errors, etc.
+      // skip 404s, parse errors, proxy errors…
     }
   }
 
@@ -60,9 +39,9 @@ export async function fetchBalloonHistory() {
 }
 
 export async function fetchWeather(lat, lon) {
+  // Open-Meteo supports CORS out of the box
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
   const res = await fetch(url)
   if (!res.ok) throw new Error(res.status)
-  const { current_weather } = await res.json()
-  return current_weather
+  return (await res.json()).current_weather
 }
