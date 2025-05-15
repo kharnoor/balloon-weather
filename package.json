@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "proxy": "https://a.windbornesystems.com",
-  "homepage": "https://kharnoor.github.io/balloon-weather/",
+  "homepage": ".",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
